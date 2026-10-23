@@ -65,8 +65,8 @@ constexpr int SAMPLES_PER_FRAME = 4096;
 constexpr REFERENCE_TIME REFERENCE_TIME_SECOND = 10000000LL;
 
 // サンプルのバッファサイズ
-// (フレーム当たりのサンプル数 * 16ビット * 5.1ch)
-constexpr long SAMPLE_BUFFER_SIZE = SAMPLES_PER_FRAME * 2 * 6;
+// (フレーム当たりのサンプル数 * 16ビット * 22.2ch)
+constexpr long SAMPLE_BUFFER_SIZE = SAMPLES_PER_FRAME * 2 * 24;
 
 // MediaSample用に確保するバッファ数
 constexpr long NUM_SAMPLE_BUFFERS = 4;
@@ -834,13 +834,19 @@ HRESULT AudioDecoderFilter::OnFrame(
 	const AudioDecoder::AudioInfo &Info,
 	FrameSampleInfo *pSampleInfo)
 {
-	if (Info.ChannelCount != 1 && Info.ChannelCount != 2 && Info.ChannelCount != 6)
+	if (Info.ChannelCount != 1
+			&& Info.ChannelCount != 2
+			&& Info.ChannelCount != 6
+			&& Info.ChannelCount != ChannelCount_22Point2)
 		return E_FAIL;
 
 	const bool DualMono = (Info.ChannelCount == 2 && Info.DualMono);
 
 	bool Passthrough = false;
-	if (m_Decoder->IsSPDIFSupported()) {
+	// 22.2chはデコード済み24ch PCMとしてDSフィルターへ渡す。
+	// AACのS/PDIFパススルーは2ch/6ch系の符号化ストリーム向けであり、
+	// 24ch音声では使用しない。
+	if ((Info.ChannelCount != ChannelCount_22Point2) && m_Decoder->IsSPDIFSupported()) {
 		if (m_SPDIFOptions.Mode == SPDIFMode::Passthrough) {
 			Passthrough = true;
 		} else if (m_SPDIFOptions.Mode == SPDIFMode::Auto) {
@@ -851,7 +857,8 @@ HRESULT AudioDecoderFilter::OnFrame(
 				switch (Info.ChannelCount) {
 				case 1: ChannelFlag = SPDIFOptions::Channel_Mono;     break;
 				case 2: ChannelFlag = SPDIFOptions::Channel_Stereo;   break;
-				case 6: ChannelFlag = SPDIFOptions::Channel_Surround; break;
+				case 6:  ChannelFlag = SPDIFOptions::Channel_Surround; break;
+				case 24: ChannelFlag = 0;                           break;
 				}
 			}
 			if ((m_SPDIFOptions.PassthroughChannels & ChannelFlag) != 0)
@@ -892,13 +899,16 @@ HRESULT AudioDecoderFilter::ProcessPCM(
 	FrameSampleInfo *pSampleInfo)
 {
 	const bool Surround = (Info.ChannelCount == 6 && !m_DownMixSurround);
-	const int OutChannels = Surround ? 6 : 2;
+	const bool Broadcast22Point2 = (Info.ChannelCount == ChannelCount_22Point2);
+	const bool ExtendedFormat = Surround || Broadcast22Point2;
+	const int OutChannels = Broadcast22Point2 ? ChannelCount_22Point2 : (Surround ? 6 : 2);
 
 	// メディアタイプの更新
 	WAVEFORMATEX *pwfx = reinterpret_cast<WAVEFORMATEX *>(m_MediaType.Format());
 	if ((*m_MediaType.FormatType() != FORMAT_WaveFormatEx)
-			|| (!Surround && (pwfx->wFormatTag != WAVE_FORMAT_PCM))
-			|| (Surround && (pwfx->wFormatTag != WAVE_FORMAT_EXTENSIBLE))
+			|| (!ExtendedFormat && (pwfx->wFormatTag != WAVE_FORMAT_PCM))
+			|| (ExtendedFormat && (pwfx->wFormatTag != WAVE_FORMAT_EXTENSIBLE))
+			|| (pwfx->nChannels != OutChannels)
 			|| (pwfx->nSamplesPerSec != Info.Frequency)) {
 		CMediaType &mt = pSampleInfo->MediaType;
 		mt.SetType(&MEDIATYPE_Audio);
@@ -906,19 +916,21 @@ HRESULT AudioDecoderFilter::ProcessPCM(
 		mt.SetFormatType(&FORMAT_WaveFormatEx);
 
 		pwfx = reinterpret_cast<WAVEFORMATEX *>(
-			mt.AllocFormatBuffer(Surround ? sizeof (WAVEFORMATEXTENSIBLE) : sizeof(WAVEFORMATEX)));
+			mt.AllocFormatBuffer(ExtendedFormat ? sizeof (WAVEFORMATEXTENSIBLE) : sizeof(WAVEFORMATEX)));
 		if (pwfx == nullptr)
 			return E_OUTOFMEMORY;
-		if (!Surround) {
+		if (!ExtendedFormat) {
 			pwfx->wFormatTag = WAVE_FORMAT_PCM;
-			pwfx->nChannels = 2;
+			pwfx->nChannels = OutChannels;
 			pwfx->cbSize = 0;
 		} else {
 			WAVEFORMATEXTENSIBLE *pExtensible = reinterpret_cast<WAVEFORMATEXTENSIBLE *>(pwfx);
 			pExtensible->Format.wFormatTag = WAVE_FORMAT_EXTENSIBLE;
-			pExtensible->Format.nChannels = 6;
+			pExtensible->Format.nChannels = OutChannels;
 			pExtensible->Format.cbSize  = sizeof(WAVEFORMATEXTENSIBLE) - sizeof(WAVEFORMATEX);
-			pExtensible->dwChannelMask =
+			// 22.2chは放送由来の順序を保持するため、標準スピーカーマスクで
+			// チャンネルを並べ替えない。下流のDSフィルターが24ch順序を解釈する。
+			pExtensible->dwChannelMask = Broadcast22Point2 ? 0 :
 				SPEAKER_FRONT_LEFT | SPEAKER_FRONT_RIGHT |
 				SPEAKER_FRONT_CENTER | SPEAKER_LOW_FREQUENCY |
 				SPEAKER_BACK_LEFT | SPEAKER_BACK_RIGHT;
@@ -971,6 +983,12 @@ HRESULT AudioDecoderFilter::ProcessPCM(
 					reinterpret_cast<const int16_t *>(pData),
 					Samples);
 			}
+			break;
+
+		case ChannelCount_22Point2:
+			// FFmpegから受け取った放送順の24chインターリーブPCMをそのまま渡す。
+			OutSize = Samples * ChannelCount_22Point2 * sizeof(int16_t);
+			std::memcpy(pOutBuff, pData, OutSize);
 			break;
 		}
 

@@ -85,7 +85,7 @@ bool AACDecoder_FFmpeg::Open()
 	if (!AACDecoder::Open())
 		return false;
 
-	constexpr size_t PCM_BUFFER_SIZE = 6 * sizeof(int16_t) * 4096;
+	constexpr size_t PCM_BUFFER_SIZE = 24 * sizeof(int16_t) * 4096;
 	if (m_PCMBuffer.AllocateBuffer(PCM_BUFFER_SIZE) < PCM_BUFFER_SIZE) {
 		Close();
 		return false;
@@ -111,9 +111,9 @@ bool AACDecoder_FFmpeg::IsOpened() const
 
 bool AACDecoder_FFmpeg::GetChannelMap(int Channels, int *pMap) const
 {
-	// 段階導入のため、まずは既存の FAAD2 / FDK AAC と同じ 2ch / 6ch のみを
-	// サポートする。22.2ch (24ch) 対応はこのデコーダで FFmpeg 連携が
-	// 問題なく動作することを確認した後の次段階とする。
+	// 2ch / 6ch は下流のチャンネルマップで使用する。
+	// 22.2ch (24ch) は放送由来のインターリーブ順をそのまま下流へ渡すため、
+	// チャンネルマップによる並べ替えを行わない。
 	switch (Channels) {
 	case 2:
 		pMap[CHANNEL_2_L] = 0;
@@ -258,8 +258,12 @@ bool AACDecoder_FFmpeg::DecodeFrame(const ADTSFrame *pFrame, ReturnArg<DecodeFra
 			m_pSwrContext = nullptr;
 		}
 
-		AVChannelLayout OutLayout;
-		::av_channel_layout_default(&OutLayout, Channels);
+		// 出力のチャンネル順序は放送からデコーダへ渡された順序を保持する。
+		// 22.2chを標準レイアウトへ暗黙変換しない。
+		AVChannelLayout OutLayout{};
+		Ret = ::av_channel_layout_copy(&OutLayout, &m_pFrame->ch_layout);
+		if (Ret < 0)
+			return false;
 
 		SwrContext *pSwr = nullptr;
 		Ret = ::swr_alloc_set_opts2(
