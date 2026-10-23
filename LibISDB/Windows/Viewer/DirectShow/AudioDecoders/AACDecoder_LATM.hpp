@@ -48,10 +48,9 @@ namespace LibISDB::DirectShow
 	/**
 	 @brief  LATM/LOAS 伝送された AAC (ISO/IEC 14496-3, stream_type 0x11) 用デコーダ
 
-	 22.2ch 等の多チャンネル音声は LATM フレーミングで伝送されるが、コンシューマ
-	 向けのオーディオ機器・LibISDB のチャンネルマップには 22.2ch という概念がそもそも
-	 存在しない。そのため、デコード結果は元のチャンネル数に関わらず常に
-	 libswresample でステレオへダウンミックスしてから返す。
+	 22.2ch等の多チャンネル音声はLATMフレーミングで伝送される。
+	 デコード後は放送由来のチャンネル順序を保持したインターリーブPCMとして返し、
+	 下流のDSフィルターにチャンネル解釈を委ねる。
 	*/
 	class AACDecoder_LATM
 		: public AudioDecoder
