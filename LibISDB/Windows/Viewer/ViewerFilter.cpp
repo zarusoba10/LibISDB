@@ -724,7 +724,20 @@ bool ViewerFilter::OpenViewer(const OpenSettings &Settings)
 		{
 			bool OK = false;
 
-			if (!Settings.AudioDevice.MonikerName.empty()) {
+			if (Settings.UseNullAudioRenderer) {
+				hr = ::CoCreateInstance(
+					CLSID_NullRenderer, nullptr, CLSCTX_INPROC_SERVER,
+					IID_PPV_ARGS(m_AudioRenderer.GetPP()));
+				if (SUCCEEDED(hr)) {
+					hr = DirectShow::AppendFilterAndConnect(
+						m_GraphBuilder.Get(), m_AudioRenderer.Get(), L"Null Audio Renderer", &OutputAudioPin);
+					if (FAILED(hr)) {
+						throw ErrorDescription(HRESULTErrorCode(hr), LIBISDB_STR("Null音声レンダラを接続できません。"));
+					}
+					m_AudioRendererName = LIBISDB_STR("Null Renderer");
+					OK = true;
+				}
+			} else if (!Settings.AudioDevice.MonikerName.empty()) {
 				hr = DirectShow::CreateFilterFromMonikerName(
 					Settings.AudioDevice.MonikerName.c_str(), &m_AudioRenderer, &m_AudioRendererName);
 				if (SUCCEEDED(hr)) {
