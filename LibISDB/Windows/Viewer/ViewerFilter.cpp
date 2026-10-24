@@ -747,7 +747,7 @@ bool ViewerFilter::OpenViewer(const OpenSettings &Settings)
 							LIBISDB_STR("Null音声レンダラ接続失敗 (HRESULT=0x{:08X}, 出力ピン={})"),
 							static_cast<unsigned int>(hr), OutputAudioPin ? 1 : 0);
 						LIBISDB_TRACE(LIBISDB_STR("{}\\n"), Detail);
-						throw ErrorDescription(HRESULTErrorCode(hr), Detail);
+						throw ErrorDescription(HRESULTErrorCode(hr), Detail.c_str());
 					}
 					m_AudioRendererName = LIBISDB_STR("Null Renderer");
 					OK = true;
@@ -817,7 +817,7 @@ bool ViewerFilter::OpenViewer(const OpenSettings &Settings)
 							static_cast<unsigned int>(hr), OutputAudioPin ? 1 : 0);
 						LIBISDB_TRACE(LIBISDB_STR("{}\\n"), Detail);
 						throw ErrorDescription(
-							HRESULTErrorCode(hr), Detail,
+							HRESULTErrorCode(hr), Detail.c_str(),
 							LIBISDB_STR("設定で有効な音声デバイスが選択されているか確認してください。"));
 					}
 				}
@@ -837,7 +837,7 @@ bool ViewerFilter::OpenViewer(const OpenSettings &Settings)
 							LIBISDB_STR("Null音声レンダラ接続失敗 (HRESULT=0x{:08X}, 出力ピン={})"),
 							static_cast<unsigned int>(hr), OutputAudioPin ? 1 : 0);
 						LIBISDB_TRACE(LIBISDB_STR("{}\\n"), Detail);
-						throw ErrorDescription(HRESULTErrorCode(hr), Detail);
+						throw ErrorDescription(HRESULTErrorCode(hr), Detail.c_str());
 					}
 					m_AudioRendererName = LIBISDB_STR("Null Renderer");
 					LIBISDB_TRACE(LIBISDB_STR("Nullレンダラを接続\n"));
