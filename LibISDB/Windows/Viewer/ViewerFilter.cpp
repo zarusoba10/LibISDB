@@ -725,6 +725,15 @@ bool ViewerFilter::OpenViewer(const OpenSettings &Settings)
 			bool OK = false;
 
 			if (Settings.UseNullAudioRenderer) {
+				// AudioDecoderFilter の再接続やメディアタイプ変更後に、
+				// 保持している出力ピンが空になる場合があるため再取得する。
+				if (!OutputAudioPin && m_AudioDecoder)
+					OutputAudioPin.Attach(DirectShow::GetFilterPin(m_AudioDecoder.Get(), PINDIR_OUTPUT));
+				if (!OutputAudioPin) {
+					throw ErrorDescription(
+						HRESULTErrorCode(E_POINTER),
+						LIBISDB_STR("音声デコーダの出力ピンを取得できません。"));
+				}
 				hr = ::CoCreateInstance(
 					CLSID_NullRenderer, nullptr, CLSCTX_INPROC_SERVER,
 					IID_PPV_ARGS(m_AudioRenderer.GetPP()));
