@@ -539,7 +539,8 @@ HRESULT AppendFilterAndConnect(
 	HRESULT hr;
 
 	// ポインタチェック
-	if ((pGraphBuilder == nullptr) || (pFilter == nullptr) || (pOutputPin == nullptr))
+	if ((pGraphBuilder == nullptr) || (pFilter == nullptr) || (pOutputPin == nullptr)
+			|| (pOutputPin->Get() == nullptr))
 		return E_POINTER;
 
 	hr = pGraphBuilder->AddFilter(pFilter, (pszFilterName != nullptr) ? pszFilterName : L"No Name");
@@ -567,8 +568,10 @@ HRESULT AppendFilterAndConnect(
 		return hr;
 	}
 
-	// 出力ピンを返す
-	pOutputPin->Attach(GetFilterPin(pFilter, PINDIR_OUTPUT));
+	// 出力ピンを返す。終端フィルター (Null Renderer 等) は出力ピンを
+	// 持たないため、入力元のピンを空にしない。
+	if (IPin *pNextOutputPin = GetFilterPin(pFilter, PINDIR_OUTPUT))
+		pOutputPin->Attach(pNextOutputPin);
 
 	return S_OK;
 }
