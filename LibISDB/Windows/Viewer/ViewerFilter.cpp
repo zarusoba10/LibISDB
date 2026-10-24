@@ -611,6 +611,16 @@ bool ViewerFilter::OpenViewer(const OpenSettings &Settings)
 			if (FAILED(hr))
 				throw ErrorDescription(HRESULTErrorCode(hr), LIBISDB_STR("音声デコーダフィルタをフィルタグラフに追加できません。"));
 
+			// AppendFilterAndConnect() は入力ピンの接続に成功しても、
+			// 変換フィルタの出力ピン取得に失敗すると出力ピンが空のままになる
+			// ことがあるため、名前付きピンを明示的に再取得する。
+			if (!OutputAudioPin)
+				hr = m_AudioDecoder->FindPin(L"Output", OutputAudioPin.GetPP());
+			if (!OutputAudioPin)
+				throw ErrorDescription(
+					HRESULTErrorCode(FAILED(hr) ? hr : E_POINTER),
+					LIBISDB_STR("音声デコーダの出力ピンを取得できません。"));
+
 			SetAudioDecoderType(m_AudioStreamType);
 
 			m_AudioDecoder->AddEventListener(this);
