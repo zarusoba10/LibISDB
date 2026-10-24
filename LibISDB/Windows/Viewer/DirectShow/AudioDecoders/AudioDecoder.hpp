@@ -27,7 +27,7 @@
 #ifndef LIBISDB_AUDIO_DECODER_H
 #define LIBISDB_AUDIO_DECODER_H
 
-#include "../../../../Templates/ReturnArg.hpp"
+#include "../../../../LibISDBBase.hpp"
 
 namespace LibISDB::DirectShow
 {
