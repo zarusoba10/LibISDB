@@ -741,7 +741,13 @@ bool ViewerFilter::OpenViewer(const OpenSettings &Settings)
 					hr = DirectShow::AppendFilterAndConnect(
 						m_GraphBuilder.Get(), m_AudioRenderer.Get(), L"Null Audio Renderer", &OutputAudioPin);
 					if (FAILED(hr)) {
-						throw ErrorDescription(HRESULTErrorCode(hr), LIBISDB_STR("Null音声レンダラを接続できません。"));
+						String Detail;
+						StringFormat(
+							&Detail,
+							LIBISDB_STR("Null音声レンダラ接続失敗 (HRESULT=0x{:08X}, 出力ピン={})"),
+							static_cast<unsigned int>(hr), OutputAudioPin ? 1 : 0);
+						LIBISDB_TRACE(LIBISDB_STR("{}\\n"), Detail);
+						throw ErrorDescription(HRESULTErrorCode(hr), Detail);
 					}
 					m_AudioRendererName = LIBISDB_STR("Null Renderer");
 					OK = true;
@@ -804,9 +810,14 @@ bool ViewerFilter::OpenViewer(const OpenSettings &Settings)
 				if (!OK) {
 					hr = m_GraphBuilder->Render(OutputAudioPin.Get());
 					if (FAILED(hr)) {
+						String Detail;
+						StringFormat(
+							&Detail,
+							LIBISDB_STR("音声レンダラ接続失敗 (HRESULT=0x{:08X}, 出力ピン={})"),
+							static_cast<unsigned int>(hr), OutputAudioPin ? 1 : 0);
+						LIBISDB_TRACE(LIBISDB_STR("{}\\n"), Detail);
 						throw ErrorDescription(
-							HRESULTErrorCode(hr),
-							LIBISDB_STR("音声レンダラを接続できません。"),
+							HRESULTErrorCode(hr), Detail,
 							LIBISDB_STR("設定で有効な音声デバイスが選択されているか確認してください。"));
 					}
 				}
@@ -820,7 +831,13 @@ bool ViewerFilter::OpenViewer(const OpenSettings &Settings)
 					hr = DirectShow::AppendFilterAndConnect(
 						m_GraphBuilder.Get(), m_AudioRenderer.Get(), L"Null Audio Renderer", &OutputAudioPin);
 					if (FAILED(hr)) {
-						throw ErrorDescription(HRESULTErrorCode(hr), LIBISDB_STR("Null音声レンダラを接続できません。"));
+						String Detail;
+						StringFormat(
+							&Detail,
+							LIBISDB_STR("Null音声レンダラ接続失敗 (HRESULT=0x{:08X}, 出力ピン={})"),
+							static_cast<unsigned int>(hr), OutputAudioPin ? 1 : 0);
+						LIBISDB_TRACE(LIBISDB_STR("{}\\n"), Detail);
+						throw ErrorDescription(HRESULTErrorCode(hr), Detail);
 					}
 					m_AudioRendererName = LIBISDB_STR("Null Renderer");
 					LIBISDB_TRACE(LIBISDB_STR("Nullレンダラを接続\n"));
