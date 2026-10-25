@@ -1957,9 +1957,12 @@ bool ViewerFilter::SetAdjustAudioStreamTime(bool Adjust)
 
 bool ViewerFilter::SetAudioSampleCallback(DirectShow::AudioDecoderFilter::SampleCallback *pCallback)
 {
+	// SetSampleCallback() is serialized with ProcessPCM() by m_cPropLock.
+	// Update the cached pointer only after the decoder has stopped any in-flight
+	// callback, so the owner can safely destroy the callback object afterwards.
+	if (m_AudioDecoder && !m_AudioDecoder->SetSampleCallback(pCallback))
+		return false;
 	m_pAudioSampleCallback = pCallback;
-	if (m_AudioDecoder)
-		return m_AudioDecoder->SetSampleCallback(pCallback);
 	return true;
 }
 
